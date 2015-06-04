@@ -2,12 +2,13 @@
 #include <QTextStream>
 #include <QDebug>
 
-#include "json.h"
+#include "../json.h"
 
-using QtJson::JsonObject;
-using QtJson::JsonArray;
+using Json::Object;
+using Json::Array;
 
-QString readFile(const QString &filename) {
+QString readFile(const QString &filename)
+{
     QFile f(filename);
     if (!f.open(QFile::ReadOnly | QFile::Text)) {
         return QString();
@@ -17,25 +18,28 @@ QString readFile(const QString &filename) {
     }
 }
 
-void printResult(const JsonObject &result) {
-    qDebug() << "encoding:" << result["encoding"].toString();
+void printResult(const Object &result)
+{
+    qDebug() << "encoding:" << result.value("encoding");
     qDebug() << "plugins:";
 
-    JsonArray plugins = result["plug-ins"].toList();
+    Array plugins = result["plug-ins"].toList();
     foreach(QVariant plugin, plugins) {
         qDebug() << "  -" << plugin.toString();
     }
 
-    JsonObject indent = result["indent"].toMap();
+    Object indent = result["indent"].toMap();
     qDebug() << "length:" << indent["length"].toInt();
     qDebug() << "use_space:" << indent["use_space"].toBool();
 }
 
-void printJson(const JsonObject &result) {
-    qDebug() << QtJson::serialize(result);
+void printJson(const Object &result)
+{
+    qDebug() << Json::stringify(result);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     QString json = readFile("example.json");
     if (json.isEmpty()) {
         qFatal("Could not read JSON file!");
@@ -43,7 +47,7 @@ int main(int argc, char **argv) {
     }
 
     bool ok;
-    JsonObject result = QtJson::parse(json, ok).toMap();
+    Object result = Json::parse(json, ok).toMap();
     if (!ok) {
         qFatal("An error occurred during parsing");
         return 1;
@@ -52,8 +56,8 @@ int main(int argc, char **argv) {
     printResult(result);
 
     // Add extra object to result which contains an array of keywords and a ratio.
-    JsonArray keywords = JsonArray() << "json" << "qt" << "parser";
-    JsonObject extra;
+    Array keywords = Array() << "json" << "qt" << "parser";
+    Object extra;
     extra["ratio"] = 3.35;
     extra["keywords"] = keywords;
     result["extra"] = extra;

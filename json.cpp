@@ -1,32 +1,13 @@
-/**
- * QtJson - A simple class for parsing JSON data into a QVariant hierarchies and vice-versa.
- * Copyright (C) 2011  Eeli Reilin
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-/**
- * \file json.cpp
- */
-
 #include <QDateTime>
 #include "json.h"
 
-namespace QtJson {
-    static QString dateFormat, dateTimeFormat;
+namespace Json
+{
+    static QString _dateFormat, _dateTimeFormat;
 
-    static QString sanitizeString(QString str);
+    static QByteArray serialize(const QVariant &data);
+    static QByteArray serialize(const QVariant &data, bool &success);
+    static QByteArray sanitizeString(QString str);
     static QByteArray join(const QList<QByteArray> &list, const QByteArray &sep);
     static QVariant parseValue(const QString &json, int &index, bool &success);
     static QVariant parseObject(const QString &json, int &index, bool &success);
@@ -39,7 +20,8 @@ namespace QtJson {
     static int nextToken(const QString &json, int &index);
 
     template<typename T>
-    QByteArray serializeMap(const T &map, bool &success) {
+    QByteArray serializeMap(const T &map, bool &success)
+    {
         QByteArray str = "{ ";
         QList<QByteArray> pairs;
         for (typename T::const_iterator it = map.begin(), itend = map.end(); it != itend; ++it) {
@@ -48,7 +30,7 @@ namespace QtJson {
                 success = false;
                 break;
             }
-            pairs << sanitizeString(it.key()).toUtf8() + " : " + serializedValue;
+            pairs << sanitizeString(it.key()) + " : " + serializedValue;
         }
 
         str += join(pairs, ", ");
@@ -56,19 +38,14 @@ namespace QtJson {
         return str;
     }
 
-
-    /**
-     * parse
-     */
-    QVariant parse(const QString &json) {
+    QVariant parse(const QString &json)
+    {
         bool success = true;
         return parse(json, success);
     }
 
-    /**
-     * parse
-     */
-    QVariant parse(const QString &json, bool &success) {
+    QVariant parse(const QString &json, bool &success)
+    {
         success = true;
 
         // Return an empty QVariant if the JSON data is either null or empty
@@ -88,12 +65,24 @@ namespace QtJson {
         }
     }
 
-    QByteArray serialize(const QVariant &data) {
+    QString stringify(const QVariant &data)
+    {
+        return QString::fromUtf8(serialize(data));
+    }
+
+    QString stringify(const QVariant &data, bool &success)
+    {
+        return QString::fromUtf8(serialize(data, success));
+    }
+
+    static QByteArray serialize(const QVariant &data)
+    {
         bool success = true;
         return serialize(data, success);
     }
 
-    QByteArray serialize(const QVariant &data, bool &success) {
+    static QByteArray serialize(const QVariant &data, bool &success)
+    {
         QByteArray str;
         success = true;
 
@@ -119,7 +108,7 @@ namespace QtJson {
             str = serializeMap<>(data.toMap(), success);
         } else if ((data.type() == QVariant::String) ||
                    (data.type() == QVariant::ByteArray)) {// a string or a byte array?
-            str = sanitizeString(data.toString()).toUtf8();
+            str = sanitizeString(data.toString());
         } else if (data.type() == QVariant::Double) { // double?
             double value = data.toDouble(&success);
             if (success) {
@@ -137,16 +126,16 @@ namespace QtJson {
         } else if (data.canConvert<long>()) { //TODO: this code is never executed because all smaller types can be converted to qlonglong
             str = QString::number(data.value<long>()).toUtf8();
         } else if (data.type() == QVariant::DateTime) { // datetime value?
-            str = sanitizeString(dateTimeFormat.isEmpty()
+            str = sanitizeString(_dateTimeFormat.isEmpty()
                                  ? data.toDateTime().toString()
-                                 : data.toDateTime().toString(dateTimeFormat)).toUtf8();
+                                 : data.toDateTime().toString(_dateTimeFormat));
         } else if (data.type() == QVariant::Date) { // date value?
-            str = sanitizeString(dateTimeFormat.isEmpty()
+            str = sanitizeString(_dateTimeFormat.isEmpty()
                                  ? data.toDate().toString()
-                                 : data.toDate().toString(dateFormat)).toUtf8();
+                                 : data.toDate().toString(_dateFormat));
         } else if (data.canConvert<QString>()) { // can value be converted to string?
             // this will catch QUrl, ... (all other types which can be converted to string)
-            str = sanitizeString(data.toString()).toUtf8();
+            str = sanitizeString(data.toString());
         } else {
             success = false;
         }
@@ -157,19 +146,9 @@ namespace QtJson {
         return QByteArray();
     }
 
-    QString serializeStr(const QVariant &data) {
-        return QString::fromUtf8(serialize(data));
-    }
 
-    QString serializeStr(const QVariant &data, bool &success) {
-        return QString::fromUtf8(serialize(data, success));
-    }
-
-
-    /**
-     * \enum JsonToken
-     */
-    enum JsonToken {
+    enum JsonToken
+    {
         JsonTokenNone = 0,
         JsonTokenCurlyOpen = 1,
         JsonTokenCurlyClose = 2,
@@ -184,7 +163,8 @@ namespace QtJson {
         JsonTokenNull = 11
     };
 
-    static QString sanitizeString(QString str) {
+    static QByteArray sanitizeString(QString str)
+    {
         str.replace(QLatin1String("\\"), QLatin1String("\\\\"));
         str.replace(QLatin1String("\""), QLatin1String("\\\""));
         str.replace(QLatin1String("\b"), QLatin1String("\\b"));
@@ -192,10 +172,11 @@ namespace QtJson {
         str.replace(QLatin1String("\n"), QLatin1String("\\n"));
         str.replace(QLatin1String("\r"), QLatin1String("\\r"));
         str.replace(QLatin1String("\t"), QLatin1String("\\t"));
-        return QString(QLatin1String("\"%1\"")).arg(str);
+        return QString(QLatin1String("\"%1\"")).arg(str).toUtf8();
     }
 
-    static QByteArray join(const QList<QByteArray> &list, const QByteArray &sep) {
+    static QByteArray join(const QList<QByteArray> &list, const QByteArray &sep)
+    {
         QByteArray res;
         Q_FOREACH(const QByteArray &i, list) {
             if (!res.isEmpty()) {
@@ -206,32 +187,30 @@ namespace QtJson {
         return res;
     }
 
-    /**
-     * parseValue
-     */
-    static QVariant parseValue(const QString &json, int &index, bool &success) {
+    static QVariant parseValue(const QString &json, int &index, bool &success)
+    {
         // Determine what kind of data we should parse by
         // checking out the upcoming token
         switch(lookAhead(json, index)) {
-            case JsonTokenString:
-                return parseString(json, index, success);
-            case JsonTokenNumber:
-                return parseNumber(json, index);
-            case JsonTokenCurlyOpen:
-                return parseObject(json, index, success);
-            case JsonTokenSquaredOpen:
-                return parseArray(json, index, success);
-            case JsonTokenTrue:
-                nextToken(json, index);
-                return QVariant(true);
-            case JsonTokenFalse:
-                nextToken(json, index);
-                return QVariant(false);
-            case JsonTokenNull:
-                nextToken(json, index);
-                return QVariant();
-            case JsonTokenNone:
-                break;
+        case JsonTokenString:
+            return parseString(json, index, success);
+        case JsonTokenNumber:
+            return parseNumber(json, index);
+        case JsonTokenCurlyOpen:
+            return parseObject(json, index, success);
+        case JsonTokenSquaredOpen:
+            return parseArray(json, index, success);
+        case JsonTokenTrue:
+            nextToken(json, index);
+            return QVariant(true);
+        case JsonTokenFalse:
+            nextToken(json, index);
+            return QVariant(false);
+        case JsonTokenNull:
+            nextToken(json, index);
+            return QVariant();
+        case JsonTokenNone:
+            break;
         }
 
         // If there were no tokens, flag the failure and return an empty QVariant
@@ -239,10 +218,8 @@ namespace QtJson {
         return QVariant();
     }
 
-    /**
-     * parseObject
-     */
-    static QVariant parseObject(const QString &json, int &index, bool &success) {
+    static QVariant parseObject(const QString &json, int &index, bool &success)
+    {
         QVariantMap map;
         int token;
 
@@ -297,10 +274,8 @@ namespace QtJson {
         return QVariant(map);
     }
 
-    /**
-     * parseArray
-     */
-    static QVariant parseArray(const QString &json, int &index, bool &success) {
+    static QVariant parseArray(const QString &json, int &index, bool &success)
+    {
         QVariantList list;
 
         nextToken(json, index);
@@ -329,10 +304,8 @@ namespace QtJson {
         return QVariant(list);
     }
 
-    /**
-     * parseString
-     */
-    static QVariant parseString(const QString &json, int &index, bool &success) {
+    static QVariant parseString(const QString &json, int &index, bool &success)
+    {
         QString s;
         QChar c;
 
@@ -378,9 +351,7 @@ namespace QtJson {
                     int remainingLength = json.size() - index;
                     if (remainingLength >= 4) {
                         QString unicodeStr = json.mid(index, 4);
-
                         int symbol = unicodeStr.toInt(0, 16);
-
                         s.append(QChar(symbol));
 
                         index += 4;
@@ -401,10 +372,8 @@ namespace QtJson {
         return QVariant(s);
     }
 
-    /**
-     * parseNumber
-     */
-    static QVariant parseNumber(const QString &json, int &index) {
+    static QVariant parseNumber(const QString &json, int &index)
+    {
         eatWhitespace(json, index);
 
         int lastIndex = lastIndexOfNumber(json, index);
@@ -435,10 +404,8 @@ namespace QtJson {
         }
     }
 
-    /**
-     * lastIndexOfNumber
-     */
-    static int lastIndexOfNumber(const QString &json, int index) {
+    static int lastIndexOfNumber(const QString &json, int index)
+    {
         int lastIndex;
 
         for(lastIndex = index; lastIndex < json.size(); lastIndex++) {
@@ -450,10 +417,8 @@ namespace QtJson {
         return lastIndex -1;
     }
 
-    /**
-     * eatWhitespace
-     */
-    static void eatWhitespace(const QString &json, int &index) {
+    static void eatWhitespace(const QString &json, int &index)
+    {
         for(; index < json.size(); index++) {
             if (QString(" \t\n\r").indexOf(json[index]) == -1) {
                 break;
@@ -461,18 +426,14 @@ namespace QtJson {
         }
     }
 
-    /**
-     * lookAhead
-     */
-    static int lookAhead(const QString &json, int index) {
+    static int lookAhead(const QString &json, int index)
+    {
         int saveIndex = index;
         return nextToken(json, saveIndex);
     }
 
-    /**
-     * nextToken
-     */
-    static int nextToken(const QString &json, int &index) {
+    static int nextToken(const QString &json, int &index)
+    {
         eatWhitespace(json, index);
 
         if (index == json.size()) {
@@ -482,16 +443,16 @@ namespace QtJson {
         QChar c = json[index];
         index++;
         switch(c.toLatin1()) {
-            case '{': return JsonTokenCurlyOpen;
-            case '}': return JsonTokenCurlyClose;
-            case '[': return JsonTokenSquaredOpen;
-            case ']': return JsonTokenSquaredClose;
-            case ',': return JsonTokenComma;
-            case '"': return JsonTokenString;
-            case '0': case '1': case '2': case '3': case '4':
-            case '5': case '6': case '7': case '8': case '9':
-            case '-': return JsonTokenNumber;
-            case ':': return JsonTokenColon;
+        case '{': return JsonTokenCurlyOpen;
+        case '}': return JsonTokenCurlyClose;
+        case '[': return JsonTokenSquaredOpen;
+        case ']': return JsonTokenSquaredClose;
+        case ',': return JsonTokenComma;
+        case '"': return JsonTokenString;
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        case '-': return JsonTokenNumber;
+        case ':': return JsonTokenColon;
         }
         index--; // ^ WTF?
 
@@ -500,7 +461,7 @@ namespace QtJson {
         // True
         if (remainingLength >= 4) {
             if (json[index] == 't' && json[index + 1] == 'r' &&
-                json[index + 2] == 'u' && json[index + 3] == 'e') {
+                    json[index + 2] == 'u' && json[index + 3] == 'e') {
                 index += 4;
                 return JsonTokenTrue;
             }
@@ -509,8 +470,8 @@ namespace QtJson {
         // False
         if (remainingLength >= 5) {
             if (json[index] == 'f' && json[index + 1] == 'a' &&
-                json[index + 2] == 'l' && json[index + 3] == 's' &&
-                json[index + 4] == 'e') {
+                    json[index + 2] == 'l' && json[index + 3] == 's' &&
+                    json[index + 4] == 'e') {
                 index += 5;
                 return JsonTokenFalse;
             }
@@ -519,7 +480,7 @@ namespace QtJson {
         // Null
         if (remainingLength >= 4) {
             if (json[index] == 'n' && json[index + 1] == 'u' &&
-                json[index + 2] == 'l' && json[index + 3] == 'l') {
+                    json[index + 2] == 'l' && json[index + 3] == 'l') {
                 index += 4;
                 return JsonTokenNull;
             }
@@ -528,20 +489,24 @@ namespace QtJson {
         return JsonTokenNone;
     }
 
-    void setDateTimeFormat(const QString &format) {
-        dateTimeFormat = format;
+    void setDateTimeFormat(const QString &format)
+    {
+        _dateTimeFormat = format;
     }
 
-    void setDateFormat(const QString &format) {
-        dateFormat = format;
+    void setDateFormat(const QString &format)
+    {
+        _dateFormat = format;
     }
 
-    QString getDateTimeFormat() {
-        return dateTimeFormat;
+    QString dateTimeFormat()
+    {
+        return _dateTimeFormat;
     }
 
-    QString getDateFormat() {
-        return dateFormat;
+    QString dateFormat()
+    {
+        return _dateFormat;
     }
 
 } //end namespace

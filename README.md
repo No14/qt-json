@@ -1,3 +1,6 @@
+origin version: https://github.com/gaudecker/qt-json
+
+
 The **qt-json** project is a simple collection of functions for parsing and serializing [JSON][js] data to and from [QVariant][var] 
 hierarchies.
 
